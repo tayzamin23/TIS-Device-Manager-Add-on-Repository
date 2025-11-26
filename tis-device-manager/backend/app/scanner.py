@@ -1,68 +1,43 @@
 # scanner.py
 import socket
 import struct
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
-# TIS/HDL discovery request (hex)
-# Header (4 bytes) 0xAA repeated, length (2 bytes), subnet(1) device(1), command(2), padding...
-# This exact discovery payload was used by official DM to request device info.
-DISCOVERY_PACKET = bytes.fromhex("AAAAAAA A0A0 0A00 FFFF 3300 000000000000".replace(" ", ""))
-
-# NOTE: above hex includes spaces removed. If you want a simpler explicit form:
-# DISCOVERY_PACKET = b"\xAA\xAA\xAA\xAA\x0A\x00\xFF\xFF\x33\x00\x00\x00\x00\x00\x00\x00"
-
-# For safety, also build a proper canonical packet in code:
+# Proper TIS discovery request frame (header + length + broadcast subnet+device + cmd + padding)
 DISCOVERY_PACKET = b"\xAA\xAA\xAA\xAA" + struct.pack("<H", 10) + b"\xFF\xFF\x33\x00" + (b"\x00" * 6)
-
+TIS_PORT = 6000
 
 def _is_valid_frame(data: bytes) -> bool:
-    """Very small validation: starts with AA AA AA AA and has at least a minimum length."""
     return len(data) >= 12 and data[0:4] == b"\xAA\xAA\xAA\xAA"
 
 
 def parse_tis_reply(data: bytes) -> Optional[dict]:
     """
     Parse a TIS device reply frame into a dict.
-    Frame layout (bytes index):
-      0-3   : header 0xAA 0xAA 0xAA 0xAA
-      4-5   : length (little endian)  (we won't rely heavily on it)
-      6     : subnet id
-      7     : device id
-      8-9   : command
-      10..  : payload (model, fw, channels, etc.) - variable by device
-    This parser tries to extract common fields we need: subnet, device_id, command, model, fw_version
+    This extracts: subnet, device_id, command, model byte (if present), fw byte (if present),
+    and returns raw hex.
     """
     try:
         if not _is_valid_frame(data):
             return None
 
-        # length little-endian
         length = struct.unpack_from("<H", data, 4)[0]
-        # minimal check
-        if length + 6 > len(data):
-            # sometimes devices respond with different lengths, but continue anyway
-            pass
-
         subnet = data[6]
         device_id = data[7]
-        command = struct.unpack_from("<H", data, 8)[0]  # two bytes
-        # payload begins at offset 10
+        command = struct.unpack_from("<H", data, 8)[0]
         payload = data[10:]
 
-        # Basic decode heuristics (common fields are typically at fixed offsets)
         model = None
         fw = None
-        channels = None
+        channels_hint = None
 
-        if len(payload) >= 2:
-            # Many devices include model id at payload[0] and fw at payload[1]
+        if len(payload) >= 1:
             model = payload[0]
-            if len(payload) >= 2:
-                fw = payload[1]
-
-        # For some devices the payload contains channel counts etc - naive attempt:
+        if len(payload) >= 2:
+            fw = payload[1]
+        # heuristic: some replies encode channel count or other hints in payload[4] or payload[5]
         if len(payload) >= 6:
-            channels = payload[4]  # heuristic only; may not exist for all models
+            channels_hint = payload[4]
 
         return {
             "subnet": int(subnet),
@@ -70,34 +45,29 @@ def parse_tis_reply(data: bytes) -> Optional[dict]:
             "command": int(command),
             "model": int(model) if model is not None else None,
             "fw": int(fw) if fw is not None else None,
-            "channels_hint": int(channels) if channels is not None else None,
+            "channels_hint": int(channels_hint) if channels_hint is not None else None,
             "raw": data.hex()
         }
     except Exception:
         return None
 
 
-def probe_tis_device(ip: str, port: int = 6000, timeout: float = 0.6) -> Tuple[bool, Optional[dict]]:
+def probe_ip_for_tis(ip: str, timeout: float = 0.6) -> Tuple[bool, Optional[dict]]:
     """
-    Send discovery packet to ip:port and wait for a reply.
-    Returns (True, parsed_dict) if reply received and parsed, else (False, None).
+    Send a discovery packet to a single IP and wait for one reply.
+    If a TIS reply is returned, parse and return it.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(timeout)
     try:
-        # send discovery packet
-        sock.sendto(DISCOVERY_PACKET, (ip, port))
-
-        # try to read one packet
+        sock.sendto(DISCOVERY_PACKET, (ip, TIS_PORT))
         data, addr = sock.recvfrom(1024)
         parsed = parse_tis_reply(data)
         if parsed:
             parsed["ip"] = addr[0]
             parsed["port"] = addr[1]
             return True, parsed
-        else:
-            # maybe device responded with non-TIS frame; treat as not found
-            return False, None
+        return False, None
     except socket.timeout:
         return False, None
     except Exception:
@@ -109,31 +79,68 @@ def probe_tis_device(ip: str, port: int = 6000, timeout: float = 0.6) -> Tuple[b
             pass
 
 
-def scan_range(base_ip: str, start: int = 1, end: int = 254, port: int = 6000, timeout: float = 0.6) -> List[dict]:
+def find_ip_comport_in_range(base_ip: str = "192.168.110.", start: int = 1, end: int = 254, timeout: float = 0.45) -> List[str]:
     """
-    Scan base_ip (like '192.168.1.') from start..end and probe each host.
-    Returns list of parsed device dicts.
+    Brute force discovery of the IP-COM device: returns list of IPs that respond with TIS frames.
+    Use a narrow range (e.g., 192.168.110.1..254) for faster results.
     """
-    found = []
-    # sanitize base ip
-    base = base_ip
-    if not base.endswith("."):
-        # allow user to pass '192.168.1' or '192.168.1.'
-        base = base.rstrip(".") + "."
+    def _ip(i: int) -> str:
+        return f"{base_ip.rstrip('.')}.{i}"
 
+    found = []
     for i in range(start, end + 1):
-        ip = f"{base}{i}"
-        ok, parsed = probe_tis_device(ip, port=port, timeout=timeout)
-        if ok and parsed:
-            found.append(parsed)
+        ip = _ip(i)
+        ok, parsed = probe_ip_for_tis(ip, timeout=timeout)
+        if ok:
+            found.append(ip)
     return found
 
 
-# Optional: small CLI test
+def discover_bus_via_ip_com(ip_com_ip: str, timeout: float = 1.0) -> List[dict]:
+    """
+    Send a discovery frame TO THE IP-COM address and read all replies from the bus until timeout.
+    Returns list of parsed device dicts (subnet/device/model/etc).
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    discovered = []
+    try:
+        sock.sendto(DISCOVERY_PACKET, (ip_com_ip, TIS_PORT))
+
+        while True:
+            try:
+                data, addr = sock.recvfrom(2048)
+                parsed = parse_tis_reply(data)
+                if parsed:
+                    parsed["ip"] = addr[0]
+                    parsed["port"] = addr[1]
+                    discovered.append(parsed)
+            except socket.timeout:
+                break
+    finally:
+        try:
+            sock.close()
+        except:
+            pass
+
+    # deduplicate by subnet+device_id
+    unique = {}
+    for d in discovered:
+        key = (d["subnet"], d["device_id"])
+        if key not in unique:
+            unique[key] = d
+    return list(unique.values())
+
+
+# Small CLI support for local testing
 if __name__ == "__main__":
     import sys
-    base = sys.argv[1] if len(sys.argv) > 1 else "192.168.1."
-    print("Scanning:", base)
-    results = scan_range(base, 1, 50, timeout=0.4)
-    for r in results:
-        print(r)
+    mode = sys.argv[1] if len(sys.argv) > 1 else "discover"
+    if mode == "find":
+        base = sys.argv[2] if len(sys.argv) > 2 else "192.168.110."
+        print("Searching IP-COM in range", base + "1..50")
+        print(find_ip_comport_in_range(base, 1, 50))
+    else:
+        ip = sys.argv[2] if len(sys.argv) > 2 else "192.168.110.205"
+        print("Discovering bus via", ip)
+        print(discover_bus_via_ip_com(ip))
