@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <title>Appliances - TIS Device Manager</title>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>TIS DM</h2>
+  <a href="/admin/dashboard">Dashboard</a>
+  <a href="/admin/devices">Devices</a>
+  <a href="/admin/appliances" class="active">Appliances</a>
+  <a href="#" onclick="logout()">Logout</a>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <h3>Appliances</h3>
+    <button onclick="publish()">Publish to HA</button>
+  </div>
+
+  <div class="card">
+    <h3>Saved Appliances</h3>
+    <pre id="list">Loading...</pre>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+async function load() {
+    const res = await api("/api/project");
+    document.getElementById("list").innerText =
+        JSON.stringify(res.appliances || [], null, 2);
+}
+
+async function publish() {
+    const host = prompt("Home Assistant URL?", "http://homeassistant.local:8123");
+    const token = prompt("Long-Lived Token?");
+    const res = await api("/api/publish", "POST", { host, token });
+    alert(JSON.stringify(res));
+}
+
+load();
+</script>
+
+</body>
+</html>
