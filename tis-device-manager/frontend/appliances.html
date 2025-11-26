@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <meta charset="utf-8">
   <title>Appliances - TIS Device Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-
 <div class="sidebar">
   <h2>TIS DM</h2>
   <a href="/admin/dashboard">Dashboard</a>
@@ -17,7 +17,9 @@
 <div class="main">
   <div class="topbar">
     <h3>Appliances</h3>
-    <button onclick="publish()">Publish to HA</button>
+    <div>
+      <button onclick="publish()">Publish to HA</button>
+    </div>
   </div>
 
   <div class="card">
@@ -26,23 +28,37 @@
   </div>
 </div>
 
-<script src="/static/js/app.js"></script>
 <script>
-async function load() {
-    const res = await api("/api/project");
-    document.getElementById("list").innerText =
-        JSON.stringify(res.appliances || [], null, 2);
+async function api(path, method="GET", body=null) {
+  const opts = { method, credentials: "include" };
+  if (body) {
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opts);
+  return r.json();
 }
 
-async function publish() {
-    const host = prompt("Home Assistant URL?", "http://homeassistant.local:8123");
-    const token = prompt("Long-Lived Token?");
-    const res = await api("/api/publish", "POST", { host, token });
-    alert(JSON.stringify(res));
+async function load(){
+  const p = await api("/api/project");
+  document.getElementById("list").innerText = JSON.stringify(p.appliances || [], null, 2);
+}
+
+async function publish(){
+  const host = prompt("Home Assistant URL?","http://homeassistant.local:8123");
+  const token = prompt("Long-Lived Token?");
+  if(!host || !token) return alert("Provide host and token");
+  const res = await api(`/api/publish`, "POST", { host, token });
+  alert(JSON.stringify(res));
+  load();
+}
+
+async function logout(){
+  await api("/api/admin/logout", "POST");
+  location.href = "/";
 }
 
 load();
 </script>
-
 </body>
 </html>
