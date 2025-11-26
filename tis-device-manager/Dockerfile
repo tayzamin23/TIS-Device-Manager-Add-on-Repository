@@ -5,7 +5,7 @@ WORKDIR /app
 # system deps for bcrypt, cryptography
 RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev
 
-COPY backend /app/backend
+COPY app/backend /app/backend
 COPY frontend /app/frontend
 COPY run.sh /app/run.sh
 
