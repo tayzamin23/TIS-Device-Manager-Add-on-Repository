@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <meta charset="utf-8">
   <title>Devices - TIS Device Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-
 <div class="sidebar">
   <h2>TIS DM</h2>
   <a href="/admin/dashboard">Dashboard</a>
@@ -17,27 +17,54 @@
 <div class="main">
   <div class="topbar">
     <h3>Devices</h3>
+    <div>
+      <span id="status">Idle</span>
+      <button onclick="doScan()">Scan</button>
+    </div>
   </div>
 
   <div class="card">
-    <input id="baseip" value="192.168.1." style="padding:8px;width:200px">
-    <button onclick="scan()">Scan</button>
+    <h3>IP-COMs found</h3>
+    <pre id="ipcom">None</pre>
   </div>
 
   <div class="card">
-    <h3>Found Devices</h3>
+    <h3>Discovered Devices</h3>
     <pre id="result">No scan yet.</pre>
   </div>
+
 </div>
 
-<script src="/static/js/app.js"></script>
 <script>
-async function scan() {
-    const base = document.getElementById("baseip").value;
-    const res = await api(`/api/scan?base_ip=${base}`);
-    document.getElementById("result").innerText = JSON.stringify(res, null, 2);
+async function api(path, method="GET", body=null) {
+  const opts = { method, credentials: "include" };
+  if (body) {
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(body);
+  }
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+async function doScan(){
+  document.getElementById("status").innerText = "Scanning...";
+  // call backend auto-discover (no ip_com param => uses 192.168.110.x range)
+  const res = await api("/api/scan");
+  document.getElementById("status").innerText = "Done";
+  document.getElementById("ipcom").innerText = JSON.stringify(res.found.map(f => f.ip || f), null, 2);
+  let devices = [];
+  res.found.forEach(f => {
+    if (f.discovered) {
+      devices = devices.concat(f.discovered);
+    }
+  });
+  document.getElementById("result").innerText = JSON.stringify(devices, null, 2);
+}
+
+async function logout(){
+  await api("/api/admin/logout", "POST");
+  location.href = "/";
 }
 </script>
-
 </body>
 </html>
