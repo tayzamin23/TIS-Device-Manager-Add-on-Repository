@@ -7,11 +7,16 @@ from typing import Optional
 import bcrypt, time, asyncio, logging
 from jose import jwt, JWTError
 
+# >>> FIX: import StaticFiles from starlette (not fastapi.staticfiles)
+from starlette.staticfiles import StaticFiles
+
 from app import scanner, store, ha_publisher, appliance_builder, listener, tis_protocol, config
 
 frontend_path = Path("/app/frontend")
 app = FastAPI(title="TIS Device Manager")
-app.mount("/static", __import__("fastapi").staticfiles.StaticFiles(directory=frontend_path), name="static")
+
+# mount static files (frontend)
+app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
 logger = logging.getLogger("uvicorn")
 SECRET_KEY = "THIS_IS_NOT_SECRET_CHANGE_IT"
@@ -21,7 +26,7 @@ TOKEN_EXPIRY = 7 * 24 * 3600
 DEFAULT_ADMIN = {"email": "admin@mail.com", "password": bcrypt.hashpw(b"1234", bcrypt.gensalt()).decode()}
 
 def create_token(email: str):
-    payload = {"email": email, "exp": time.time() + TOKEN_EXPIRY}
+    payload = {"email": email, "exp": int(time.time() + TOKEN_EXPIRY)}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_token(token: str):
@@ -144,7 +149,7 @@ async def api_publish(host: str, token: str, user=Depends(get_current_user)):
     mapping = []
     for ap in appliances:
         name = ap.get("name")
-        safe = "".join(ch for ch in name.replace(" ", "_").lower() if (ch.isalnum() or ch == "_"))
+        safe = "".join(ch for ch.replace(" ", "_").lower() if (ch.isalnum() or ch == "_"))
         entity_id = f"tis.{safe}"
         device_ref = ap.get("device")
         ch = ap.get("channels", {}).get("channel")
