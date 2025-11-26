@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <title>Devices - TIS Device Manager</title>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>TIS DM</h2>
+  <a href="/admin/dashboard">Dashboard</a>
+  <a href="/admin/devices" class="active">Devices</a>
+  <a href="/admin/appliances">Appliances</a>
+  <a href="#" onclick="logout()">Logout</a>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <h3>Devices</h3>
+  </div>
+
+  <div class="card">
+    <input id="baseip" value="192.168.1." style="padding:8px;width:200px">
+    <button onclick="scan()">Scan</button>
+  </div>
+
+  <div class="card">
+    <h3>Found Devices</h3>
+    <pre id="result">No scan yet.</pre>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+async function scan() {
+    const base = document.getElementById("baseip").value;
+    const res = await api(`/api/scan?base_ip=${base}`);
+    document.getElementById("result").innerText = JSON.stringify(res, null, 2);
+}
+</script>
+
+</body>
+</html>
