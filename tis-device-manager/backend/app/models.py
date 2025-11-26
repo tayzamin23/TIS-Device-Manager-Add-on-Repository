@@ -1,25 +1,19 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 class Device(BaseModel):
+    name: str
     ip: str
-    port: int = 6000
-    name: Optional[str] = None
-    subnet_id: Optional[int] = None
-    device_id: Optional[int] = None
-
+    subnet: int
+    device_id: int
+    type: str
 
 class Appliance(BaseModel):
-    id: str
     name: str
-    device_ip: str
-    device_port: int = 6000
-    type: str  # switch, dimmer, shutter, sensor, etc.
-    channel: int
-    metadata: Optional[dict] = {}
-
+    type: str
+    device: str
+    channels: dict
 
 class Project(BaseModel):
-    name: str
     devices: List[Device] = []
     appliances: List[Appliance] = []
