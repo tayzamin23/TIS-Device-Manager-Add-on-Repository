@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <title>TIS Device Manager</title>
+</head>
+<body>
+
+<div class="main" style="margin-left:0; max-width:400px; margin:60px auto;">
+  <div class="card">
+    <h2>TIS Device Manager Login</h2>
+    <p>Email</p>
+    <input id="email" type="text" value="admin@mail.com" style="width:100%;padding:10px">
+    <p>Password</p>
+    <input id="password" type="password" value="1234" style="width:100%;padding:10px;margin-bottom:20px">
+    <button onclick="login()">Login</button>
+  </div>
+</div>
+
+<script>
+async function login() {
+    const form = new FormData();
+    form.append("username", document.getElementById("email").value);
+    form.append("password", document.getElementById("password").value);
+
+    const res = await fetch("/api/admin/login", {
+        method: "POST",
+        body: form,
+        credentials: "include"
+    });
+
+    if (res.status === 200) {
+        window.location.href = "/admin/dashboard";
+    } else {
+        alert("Login failed");
+    }
+}
+</script>
+
+</body>
+</html>
