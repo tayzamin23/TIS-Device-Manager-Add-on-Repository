@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TIS Device Manager</title>
+</head>
+<body>
+  <h1>TIS Device Manager</h1>
+  <p>Scan your TIS network</p>
+  <input id="scan-ip" value="192.168.1."/>
+  <button onclick="doScan()">Scan</button>
+
+  <pre id="out"></pre>
+
+<script>
+async function doScan() {
+  const base = document.getElementById('scan-ip').value;
+  const res = await fetch('/api/scan?base_ip=' + base);
+  const json = await res.json();
+  document.getElementById('out').innerText = JSON.stringify(json, null, 2);
+}
+</script>
+</body>
+</html>
