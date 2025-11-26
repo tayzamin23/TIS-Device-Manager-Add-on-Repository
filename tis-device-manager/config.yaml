@@ -5,14 +5,17 @@ description: Open-source TIS Device Manager for Home Assistant
 startup: application
 boot: auto
 host_network: true
-options: {}
-schema: {}
+ingress: false
+panel_icon: mdi:cog-outline
+
 arch:
+  - amd64
   - aarch64
   - armv7
   - armhf
-  - amd64
-ingress: false
-panel_icon: mdi:cog-outline
+
 ports:
   8080/tcp: 8080
+
+options: {}
+schema: {}
