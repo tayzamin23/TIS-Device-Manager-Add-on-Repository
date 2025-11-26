@@ -2,22 +2,52 @@
 <html>
 <head>
   <title>TIS Device Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <h1>TIS Device Manager</h1>
-  <p>Scan your TIS network</p>
-  <input id="scan-ip" value="192.168.1."/>
-  <button onclick="doScan()">Scan</button>
 
-  <pre id="out"></pre>
+<!-- 1️⃣ Sidebar (TOP) -->
+<div class="sidebar">
+  <h2>TIS DM</h2>
+  <a href="/admin/dashboard">Dashboard</a>
+  <a href="/admin/devices">Devices</a>
+  <a href="/admin/appliances">Appliances</a>
+  <a href="#" onclick="logout()">Logout</a>
+</div>
+
+<!-- 2️⃣ Main Content -->
+<div class="main">
+
+  <div class="topbar">
+    <h3>Scan Page</h3>
+  </div>
+
+  <div class="card">
+    <h3>TIS Device Manager</h3>
+    <p>Scan your TIS network</p>
+
+    <input id="scan-ip" value="192.168.1." style="padding:8px;margin-right:10px">
+    <button onclick="doScan()">Scan</button>
+  </div>
+
+  <div class="card">
+    <h3>Results</h3>
+    <pre id="out">No scan performed yet.</pre>
+  </div>
+
+</div>
+
+<!-- 3️⃣ Shared JS (BOTTOM) -->
+<script src="/static/js/app.js"></script>
 
 <script>
 async function doScan() {
   const base = document.getElementById('scan-ip').value;
-  const res = await fetch('/api/scan?base_ip=' + base);
+  const res = await fetch('/api/scan?base_ip=' + base, { credentials: "include" });
   const json = await res.json();
   document.getElementById('out').innerText = JSON.stringify(json, null, 2);
 }
 </script>
+
 </body>
 </html>
