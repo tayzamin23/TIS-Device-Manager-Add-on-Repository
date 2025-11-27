@@ -1,15 +1,17 @@
-FROM python:3.12-alpine
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# system deps for bcrypt, cryptography
-RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev
+COPY backend/requirements.txt /app/requirements.txt
 
-COPY app/backend /app/backend
-COPY frontend /app/frontend
+RUN apt-get update \
+    && apt-get install -y gcc python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend /app/backend
 COPY run.sh /app/run.sh
 
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 RUN chmod +x /app/run.sh
 
