@@ -9,6 +9,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend /app/backend
+COPY frontend/ app/frontend
 COPY run.sh /app/run.sh
 
 RUN pip install --no-cache-dir -r /app/requirements.txt
